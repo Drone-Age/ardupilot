@@ -4077,9 +4077,13 @@ void GCS_MAVLINK::handle_odometry(const mavlink_message_t &msg)
 
     float posErr = 0;
     float angErr = 0;
+    float velErr = 0;
     if (!isnan(m.pose_covariance[0])) {
         posErr = sqrtf(m.pose_covariance[0]+m.pose_covariance[6]+m.pose_covariance[11]);
         angErr = sqrtf(m.pose_covariance[15]+m.pose_covariance[18]+m.pose_covariance[20]);
+    }
+    if (!isnan(m.velocity_covariance[0])) {
+        velErr = sqrtf(m.velocity_covariance[0]+m.velocity_covariance[6]+m.velocity_covariance[11]);
     }
 
     const uint32_t timestamp_ms = correct_offboard_timestamp_usec_to_ms(m.time_usec, PAYLOAD_SIZE(chan, ODOMETRY));
@@ -4088,7 +4092,7 @@ void GCS_MAVLINK::handle_odometry(const mavlink_message_t &msg)
     // convert velocity vector from FRD to NED frame
     Vector3f vel{m.vx, m.vy, m.vz};
     vel = q * vel;
-    visual_odom->handle_vision_speed_estimate(m.time_usec, timestamp_ms, vel, 0, m.reset_counter, m.quality);
+    visual_odom->handle_vision_speed_estimate(m.time_usec, timestamp_ms, vel, velErr, m.reset_counter, m.quality);
 }
 
 // there are several messages which all have identical fields in them.
