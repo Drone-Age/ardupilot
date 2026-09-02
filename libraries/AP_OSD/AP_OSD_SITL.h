@@ -94,6 +94,10 @@ private:
     HAL_Semaphore mutex;
     uint32_t counter;
     uint32_t last_counter;
+    int udp_fd{-1};
+    uint32_t udp_sequence;
+
+    void send_udp_frame(const uint8_t *framebuffer, uint16_t framebuffer_size);
 };
 
 #endif // WITH_SITL_OSD

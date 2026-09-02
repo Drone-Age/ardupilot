@@ -33,6 +33,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 #include "pthread.h"
 
 #include <AP_Notify/AP_Notify.h>
@@ -119,6 +121,38 @@ void AP_OSD_SITL::flush(void)
     counter++;
 }
 
+void AP_OSD_SITL::send_udp_frame(const uint8_t *framebuffer, const uint16_t framebuffer_size)
+{
+    if (udp_fd < 0 || framebuffer == nullptr || framebuffer_size > 60U * 22U) {
+        return;
+    }
+    struct PACKED FrameHeader {
+        uint32_t magic;
+        uint8_t version;
+        uint8_t columns;
+        uint8_t rows;
+        uint8_t reserved;
+        uint32_t sequence;
+    };
+    uint8_t packet[sizeof(FrameHeader) + 60U * 22U];
+    FrameHeader header{
+        htonl(0x444f5344U), // "DOSD"
+        1,
+        video_cols,
+        video_lines,
+        0,
+        htonl(++udp_sequence),
+    };
+    memcpy(packet, &header, sizeof(header));
+    memcpy(&packet[sizeof(header)], framebuffer, framebuffer_size);
+    sockaddr_in destination{};
+    destination.sin_family = AF_INET;
+    destination.sin_port = htons(14670);
+    destination.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    IGNORE_RETURN(sendto(udp_fd, packet, sizeof(header) + framebuffer_size, MSG_DONTWAIT,
+                         reinterpret_cast<const sockaddr *>(&destination), sizeof(destination)));
+}
+
 // main loop of graphics thread
 void AP_OSD_SITL::update_thread(void)
 {
@@ -153,6 +187,7 @@ void AP_OSD_SITL::update_thread(void)
                     WITH_SEMAPHORE(mutex);
                     memcpy(buffer2, buffer, sizeof(buffer2));
                 }
+                send_udp_frame(&buffer2[0][0], sizeof(buffer2));
                 w->clear();
 
                 for (uint8_t y=0; y<video_lines; y++) {
@@ -188,6 +223,7 @@ void *AP_OSD_SITL::update_thread_start(void *obj)
 // initialise backend
 bool AP_OSD_SITL::init(void)
 {
+    udp_fd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
     pthread_create(&thread, NULL, update_thread_start, this);
     return true;
 }

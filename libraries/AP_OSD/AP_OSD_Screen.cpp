@@ -49,6 +49,9 @@
 #include <AP_WindVane/AP_WindVane.h>
 #endif
 #include <AP_Filesystem/AP_Filesystem.h>
+#if AP_CARGO_IMPACT_ENABLED
+#include <AP_CargoImpact/AP_CargoImpact.h>
+#endif
 
 #include <ctype.h>
 #include <GCS_MAVLink/GCS.h>
@@ -1172,6 +1175,38 @@ const AP_Param::GroupInfo AP_OSD_Screen::var_info2[] = {
     // @Description: Index of the ESC to use for displaying ESC information. 0 means use the ESC with the highest value.
     // @Range: 0 32
     AP_GROUPINFO("ESC_IDX", 10, AP_OSD_Screen, esc_index, 0),
+#endif
+
+#if AP_CARGO_IMPACT_ENABLED
+    // @Param: CIMP_MARK_EN
+    // @DisplayName: Cargo impact marker enable
+    // @Description: Displays the earth-fixed predicted cargo impact point. X and Y define the optical centre of a 30 by 16 analogue OSD grid.
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Advanced
+
+    // @Param: CIMP_MARK_X
+    // @DisplayName: Cargo impact optical centre X
+    // @Range: 0 29
+
+    // @Param: CIMP_MARK_Y
+    // @DisplayName: Cargo impact optical centre Y
+    // @Range: 0 15
+    AP_SUBGROUPINFO(cimp_mark, "CIMP_MARK", 11, AP_OSD_Screen, AP_OSD_Setting),
+
+    // @Param: CIMP_STAT_EN
+    // @DisplayName: Cargo impact status enable
+    // @Description: Displays prediction readiness and time to impact
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Advanced
+
+    // @Param: CIMP_STAT_X
+    // @DisplayName: Cargo impact status X
+    // @Range: 0 59
+
+    // @Param: CIMP_STAT_Y
+    // @DisplayName: Cargo impact status Y
+    // @Range: 0 21
+    AP_SUBGROUPINFO(cimp_stat, "CIMP_STAT", 12, AP_OSD_Screen, AP_OSD_Setting),
 #endif
 
     AP_GROUPEND
@@ -2567,6 +2602,35 @@ void AP_OSD_Screen::draw_rngf(uint8_t x, uint8_t y)
 }
 #endif
 
+#if AP_CARGO_IMPACT_ENABLED
+void AP_OSD_Screen::draw_cimp_mark(uint8_t x, uint8_t y)
+{
+    AP_CargoImpact *assistant = AP::cargo_impact();
+    if (assistant == nullptr) {
+        return;
+    }
+    AP_CargoImpact::OSDProjection projection{};
+    if (!assistant->get_osd_projection(x, y, projection) || projection.behind_camera) {
+        return;
+    }
+    backend->write(projection.x, projection.y, false, projection.clipped ? ">" : "X");
+}
+
+void AP_OSD_Screen::draw_cimp_stat(uint8_t x, uint8_t y)
+{
+    AP_CargoImpact *assistant = AP::cargo_impact();
+    if (assistant == nullptr) {
+        return;
+    }
+    const AP_CargoImpact::Result &result = assistant->result();
+    if (result.valid()) {
+        backend->write(x, y, false, "CIMP %.1fs", (double)result.time_to_impact_s);
+    } else {
+        backend->write(x, y, true, "CIMP E%u", unsigned(result.status));
+    }
+}
+#endif
+
 #define DRAW_SETTING(n) if (n.enabled) draw_ ## n(n.xpos, n.ypos)
 
 #if HAL_WITH_OSD_BITMAP || HAL_WITH_MSP_DISPLAYPORT
@@ -2593,6 +2657,10 @@ void AP_OSD_Screen::draw(void)
 
 #if AP_RANGEFINDER_ENABLED
     DRAW_SETTING(rngf);
+#endif
+#if AP_CARGO_IMPACT_ENABLED
+    DRAW_SETTING(cimp_mark);
+    DRAW_SETTING(cimp_stat);
 #endif
     DRAW_SETTING(waypoint);
     DRAW_SETTING(xtrack_error);
