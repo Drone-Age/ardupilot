@@ -1210,6 +1210,24 @@ void GCS_MAVLINK_Copter::handle_message(const mavlink_message_t &msg)
 {
 
     switch (msg.msgid) {
+#if AP_CARGO_IMPACT_ENABLED
+    case MAVLINK_MSG_ID_TUNNEL: {
+        mavlink_tunnel_t packet;
+        mavlink_msg_tunnel_decode(&msg, &packet);
+        if (packet.target_system != 0 && packet.target_system != mavlink_system.sysid) {
+            break;
+        }
+        if (packet.target_component != 0 && packet.target_component != mavlink_system.compid) {
+            break;
+        }
+        if (packet.payload_type == AP_CargoImpact::TUNNEL_PAYLOAD_TYPE) {
+            IGNORE_RETURN(copter.cargo_impact.handle_external_packet(packet.payload, packet.payload_length));
+            break;
+        }
+        GCS_MAVLINK::handle_message(msg);
+        break;
+    }
+#endif
 #if MODE_GUIDED_ENABLED
     case MAVLINK_MSG_ID_SET_ATTITUDE_TARGET:
         handle_message_set_attitude_target(msg);

@@ -332,6 +332,12 @@ const AP_Param::Info Copter::var_info[] = {
     GOBJECT(camera, "CAM", AP_Camera),
 #endif
 
+#if AP_CARGO_IMPACT_ENABLED
+    // @Group: CIMP_
+    // @Path: ../libraries/AP_CargoImpact/AP_CargoImpact.cpp
+    GOBJECT(cargo_impact, "CIMP_", AP_CargoImpact),
+#endif
+
 #if AP_RELAY_ENABLED
     // @Group: RELAY
     // @Path: ../libraries/AP_Relay/AP_Relay.cpp

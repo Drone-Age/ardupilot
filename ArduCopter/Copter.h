@@ -128,6 +128,7 @@
 #include <AP_Mount/AP_Mount.h>
 
 #include <AP_Camera/AP_Camera.h>
+#include <AP_CargoImpact/AP_CargoImpact.h>
 
 #if HAL_BUTTON_ENABLED
  # include <AP_Button/AP_Button.h>
@@ -495,6 +496,10 @@ private:
     // Camera
 #if AP_CAMERA_ENABLED
     AP_Camera camera{MASK_LOG_CAMERA};
+#endif
+
+#if AP_CARGO_IMPACT_ENABLED
+    AP_CargoImpact cargo_impact;
 #endif
 
     // Camera/Antenna mount tracking and stabilisation stuff

@@ -34,6 +34,7 @@
 #endif
 #include <AC_Fence/AC_Fence_config.h>
 #include <AP_RangeFinder/AP_RangeFinder_config.h>
+#include <AP_CargoImpact/AP_CargoImpact_config.h>
 
 class AP_OSD_Backend;
 class AP_MSP;
@@ -236,6 +237,10 @@ private:
     AP_OSD_Setting pluscode;
 #endif
     AP_OSD_Setting sidebars{false, 4, 5};
+#if AP_CARGO_IMPACT_ENABLED
+    AP_OSD_Setting cimp_mark{false, 15, 8};
+    AP_OSD_Setting cimp_stat{false, 1, 15};
+#endif
 
 #if AP_OSD_EXTENDED_LNK_STATS
     // Extended link stats data panels
@@ -337,6 +342,10 @@ private:
 #endif
 #if AP_RANGEFINDER_ENABLED
     void draw_rngf(uint8_t x, uint8_t y);
+#endif
+#if AP_CARGO_IMPACT_ENABLED
+    void draw_cimp_mark(uint8_t x, uint8_t y);
+    void draw_cimp_stat(uint8_t x, uint8_t y);
 #endif
 
 #if AP_OSD_EXTENDED_LNK_STATS
