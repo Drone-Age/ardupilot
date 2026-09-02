@@ -269,6 +269,7 @@ BUILD_OPTIONS = [
     Feature('Payload', 'WINCH', 'AP_WINCH_ENABLED', 'Enable Winch', 0, None),
     Feature('Payload', 'WINCH_DAIWA', 'AP_WINCH_DAIWA_ENABLED', 'Enable DAIWA Winch', 0, 'WINCH'),
     Feature('Payload', 'WINCH_PWM', 'AP_WINCH_PWM_ENABLED', 'Enable PWM Winch', 0, 'WINCH'),
+    Feature('Payload', 'CARGO_IMPACT_ASSISTANT', 'AP_CARGO_IMPACT_ENABLED', 'Enable passive civil cargo impact prediction and OSD display', 0, None),
 
     Feature('Payload', 'RELAY', 'AP_RELAY_ENABLED', 'Enable Relays', 0, None),
     Feature('Payload', 'SERVORELAY_EVENTS', 'AP_SERVORELAYEVENTS_ENABLED', 'Enable Servo/Relay Event', 0, None),
