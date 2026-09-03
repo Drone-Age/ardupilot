@@ -8,6 +8,8 @@
 #include <AP_Mount/AP_Mount.h>
 #include <cstring>
 
+extern const AP_HAL::HAL &hal;
+
 AP_CargoImpact *AP_CargoImpact::_singleton;
 
 const AP_Param::GroupInfo AP_CargoImpact::var_info[] = {
@@ -76,34 +78,6 @@ const AP_Param::GroupInfo AP_CargoImpact::var_info[] = {
     // @Values: 0:Camera1,1:Camera2
     // @User: Advanced
     AP_GROUPINFO("CAMSEL", 8, AP_CargoImpact, _active_camera, 0),
-
-    // @Param: C1_TYPE
-    // @DisplayName: Camera 1 lens type
-    // @Description: Fixed uses configured field of view. Dynamic requires fresh field of view updates from the camera companion protocol.
-    // @Values: 0:Fixed,1:DynamicVarifocal
-    // @User: Advanced
-    AP_GROUPINFO("C1_TYPE", 19, AP_CargoImpact, _camera1_type, 0),
-
-    // @Param: C1_MNT
-    // @DisplayName: Camera 1 mount instance
-    // @Description: Mount instance supplying live camera attitude, or minus one to use the configured body angles
-    // @Range: -1 1
-    // @User: Advanced
-    AP_GROUPINFO("C1_MNT", 20, AP_CargoImpact, _camera1_mount_instance, -1),
-
-    // @Param: C2_TYPE
-    // @DisplayName: Camera 2 lens type
-    // @Description: Fixed uses configured field of view. Dynamic requires fresh field of view updates from the camera companion protocol.
-    // @Values: 0:Fixed,1:DynamicVarifocal
-    // @User: Advanced
-    AP_GROUPINFO("C2_TYPE", 21, AP_CargoImpact, _camera2_type, 0),
-
-    // @Param: C2_MNT
-    // @DisplayName: Camera 2 mount instance
-    // @Description: Mount instance supplying live camera attitude, or minus one to use the configured body angles
-    // @Range: -1 1
-    // @User: Advanced
-    AP_GROUPINFO("C2_MNT", 22, AP_CargoImpact, _camera2_mount_instance, -1),
 
     // @Param: C1_HFOV
     // @DisplayName: Camera 1 horizontal field of view
@@ -176,6 +150,57 @@ const AP_Param::GroupInfo AP_CargoImpact::var_info[] = {
     // @Range: -180 180
     // @User: Advanced
     AP_GROUPINFO("C2_YAW", 18, AP_CargoImpact, _camera2_yaw_deg, 0.0f),
+
+    // @Param: C1_TYPE
+    // @DisplayName: Camera 1 lens type
+    // @Description: Fixed uses configured field of view. Dynamic requires fresh field of view updates from the camera companion protocol.
+    // @Values: 0:Fixed,1:DynamicVarifocal
+    // @User: Advanced
+    AP_GROUPINFO("C1_TYPE", 19, AP_CargoImpact, _camera1_type, 0),
+
+    // @Param: C1_MNT
+    // @DisplayName: Camera 1 mount instance
+    // @Description: Mount instance supplying live camera attitude, or minus one to use the configured body angles
+    // @Range: -1 1
+    // @User: Advanced
+    AP_GROUPINFO("C1_MNT", 20, AP_CargoImpact, _camera1_mount_instance, -1),
+
+    // @Param: C2_TYPE
+    // @DisplayName: Camera 2 lens type
+    // @Description: Fixed uses configured field of view. Dynamic requires fresh field of view updates from the camera companion protocol.
+    // @Values: 0:Fixed,1:DynamicVarifocal
+    // @User: Advanced
+    AP_GROUPINFO("C2_TYPE", 21, AP_CargoImpact, _camera2_type, 0),
+
+    // @Param: C2_MNT
+    // @DisplayName: Camera 2 mount instance
+    // @Description: Mount instance supplying live camera attitude, or minus one to use the configured body angles
+    // @Range: -1 1
+    // @User: Advanced
+    AP_GROUPINFO("C2_MNT", 22, AP_CargoImpact, _camera2_mount_instance, -1),
+
+    // @Param: WIND_SRC
+    // @DisplayName: Wind source
+    // @Description: Selects AHRS-estimated wind or a configured NED wind vector. The configured source is useful when the simulator or a ground station supplies known wind without an airspeed sensor.
+    // @Values: 0:AHRS,1:Configured
+    // @User: Advanced
+    AP_GROUPINFO("WIND_SRC", 23, AP_CargoImpact, _wind_source, 0),
+
+    // @Param: WIND_N
+    // @DisplayName: Configured north wind
+    // @Description: North component of the configured air-mass velocity used by the DragWind model
+    // @Units: m/s
+    // @Range: -50 50
+    // @User: Advanced
+    AP_GROUPINFO("WIND_N", 24, AP_CargoImpact, _wind_north_ms, 0.0f),
+
+    // @Param: WIND_E
+    // @DisplayName: Configured east wind
+    // @Description: East component of the configured air-mass velocity used by the DragWind model
+    // @Units: m/s
+    // @Range: -50 50
+    // @User: Advanced
+    AP_GROUPINFO("WIND_E", 25, AP_CargoImpact, _wind_east_ms, 0.0f),
 
     AP_GROUPEND
 };
@@ -365,9 +390,21 @@ void AP_CargoImpact::update()
     }
     float height_agl_m;
     if (!ahrs.get_hagl(height_agl_m) || !is_positive(height_agl_m)) {
-        _result.status = Status::NO_HEIGHT;
-        write_log();
-        return;
+        // GPS-only Copter operation does not necessarily provide terrain HAGL.
+        // The EKF origin is established at the launch surface, so NED down
+        // position supplies the relative GPS altitude without Odometry/VINS.
+        const float gps_relative_height_m = -position_ned_m.z;
+        if (is_positive(gps_relative_height_m)) {
+            height_agl_m = gps_relative_height_m;
+        } else if (!hal.util->get_soft_armed()) {
+            // Provide a deterministic ground-level preview so an operator can
+            // verify the dedicated OSD marker before allowing a mission to arm.
+            height_agl_m = 0.1f;
+        } else {
+            _result.status = Status::NO_HEIGHT;
+            write_log();
+            return;
+        }
     }
 
     bool success = false;
@@ -376,7 +413,9 @@ void AP_CargoImpact::update()
                                    _release_delay_s, _result);
     } else if (_mode == Mode::DRAG_WIND) {
         Vector3f wind_ned_ms;
-        if (!ahrs.get_wind(wind_ned_ms)) {
+        if (_wind_source.get() == 1) {
+            wind_ned_ms = Vector3f{_wind_north_ms.get(), _wind_east_ms.get(), 0.0f};
+        } else if (!ahrs.get_wind(wind_ned_ms)) {
             _result.status = Status::NO_WIND;
             write_log();
             return;
@@ -602,8 +641,9 @@ bool AP_CargoImpact::project_camera_line_of_sight(const Vector3f &line_of_sight_
     const float y_offset = vertical_angle / radians(vertical_fov_deg * 0.5f) * 8.0f;
     const int16_t raw_x = int16_t(roundf(centre_x + x_offset));
     const int16_t raw_y = int16_t(roundf(centre_y + y_offset));
-    projection.x = constrain_int16(raw_x, 0, 29);
-    projection.y = constrain_int16(raw_y, 0, 15);
+    // Keep one-cell margins for the 3x3 OSD reticle.
+    projection.x = constrain_int16(raw_x, 1, 28);
+    projection.y = constrain_int16(raw_y, 1, 14);
     projection.clipped = raw_x != projection.x || raw_y != projection.y;
     return true;
 }
