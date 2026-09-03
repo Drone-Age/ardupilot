@@ -1178,35 +1178,35 @@ const AP_Param::GroupInfo AP_OSD_Screen::var_info2[] = {
 #endif
 
 #if AP_CARGO_IMPACT_ENABLED
-    // @Param: CIMP_MARK_EN
+    // @Param: CIMP_MRK_EN
     // @DisplayName: Cargo impact marker enable
     // @Description: Displays the earth-fixed predicted cargo impact point. X and Y define the optical centre of a 30 by 16 analogue OSD grid.
     // @Values: 0:Disabled,1:Enabled
     // @User: Advanced
 
-    // @Param: CIMP_MARK_X
+    // @Param: CIMP_MRK_X
     // @DisplayName: Cargo impact optical centre X
     // @Range: 0 29
 
-    // @Param: CIMP_MARK_Y
+    // @Param: CIMP_MRK_Y
     // @DisplayName: Cargo impact optical centre Y
     // @Range: 0 15
-    AP_SUBGROUPINFO(cimp_mark, "CIMP_MARK", 11, AP_OSD_Screen, AP_OSD_Setting),
+    AP_SUBGROUPINFO(cimp_mark, "CIMP_MRK", 11, AP_OSD_Screen, AP_OSD_Setting),
 
-    // @Param: CIMP_STAT_EN
+    // @Param: CIMP_ST_EN
     // @DisplayName: Cargo impact status enable
     // @Description: Displays prediction readiness and time to impact
     // @Values: 0:Disabled,1:Enabled
     // @User: Advanced
 
-    // @Param: CIMP_STAT_X
+    // @Param: CIMP_ST_X
     // @DisplayName: Cargo impact status X
     // @Range: 0 59
 
-    // @Param: CIMP_STAT_Y
+    // @Param: CIMP_ST_Y
     // @DisplayName: Cargo impact status Y
     // @Range: 0 21
-    AP_SUBGROUPINFO(cimp_stat, "CIMP_STAT", 12, AP_OSD_Screen, AP_OSD_Setting),
+    AP_SUBGROUPINFO(cimp_stat, "CIMP_ST", 12, AP_OSD_Screen, AP_OSD_Setting),
 #endif
 
     AP_GROUPEND
@@ -2594,7 +2594,25 @@ void AP_OSD_Screen::draw_cimp_mark(uint8_t x, uint8_t y)
     if (!assistant->get_osd_projection(x, y, projection) || projection.behind_camera) {
         return;
     }
-    backend->write(projection.x, projection.y, false, projection.clipped ? ">" : "X");
+    const uint8_t marker_x = constrain_int16(projection.x, 1, 28);
+    const uint8_t marker_y = constrain_int16(projection.y, 1, 14);
+    char centre = 'X';
+    if (projection.clipped) {
+        if (projection.x <= 1) {
+            centre = '<';
+        } else if (projection.x >= 28) {
+            centre = '>';
+        } else if (projection.y <= 1) {
+            centre = '^';
+        } else {
+            centre = 'v';
+        }
+    }
+    // Render one calculated impact point as a compact 3x3 reticle. A single
+    // MAX7456 character is too easy to lose over detailed camera imagery.
+    backend->write(marker_x - 1, marker_y - 1, false, " + ");
+    backend->write(marker_x - 1, marker_y, false, "+%c+", centre);
+    backend->write(marker_x - 1, marker_y + 1, false, " + ");
 }
 
 void AP_OSD_Screen::draw_cimp_stat(uint8_t x, uint8_t y)
@@ -2638,10 +2656,6 @@ void AP_OSD_Screen::draw(void)
 
 #if AP_RANGEFINDER_ENABLED
     DRAW_SETTING(rngf);
-#endif
-#if AP_CARGO_IMPACT_ENABLED
-    DRAW_SETTING(cimp_mark);
-    DRAW_SETTING(cimp_stat);
 #endif
     DRAW_SETTING(waypoint);
     DRAW_SETTING(xtrack_error);
@@ -2714,6 +2728,14 @@ void AP_OSD_Screen::draw(void)
     DRAW_SETTING(rc_snr);
     DRAW_SETTING(rc_active_antenna);
     DRAW_SETTING(rc_lq);
+#endif
+
+#if AP_CARGO_IMPACT_ENABLED
+    // The prediction cue is a safety-critical overlay. Draw it last so the
+    // normal screen items cannot erase CIMP text or the impact marker when
+    // their configured cells overlap.
+    DRAW_SETTING(cimp_mark);
+    DRAW_SETTING(cimp_stat);
 #endif
 }
 #endif

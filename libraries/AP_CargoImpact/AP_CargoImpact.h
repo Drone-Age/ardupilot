@@ -135,6 +135,9 @@ private:
     AP_Float _cda_m2;
     AP_Float _release_delay_s;
     AP_Float _air_density_kgm3;
+    AP_Int8 _wind_source;
+    AP_Float _wind_north_ms;
+    AP_Float _wind_east_ms;
     AP_Int16 _external_timeout_ms;
     AP_Int8 _active_camera;
     AP_Int8 _camera1_type;

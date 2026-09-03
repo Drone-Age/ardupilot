@@ -33,6 +33,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <cstdlib>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include "pthread.h"
@@ -156,6 +157,24 @@ void AP_OSD_SITL::send_udp_frame(const uint8_t *framebuffer, const uint16_t fram
 // main loop of graphics thread
 void AP_OSD_SITL::update_thread(void)
 {
+    // The camera compositor consumes the character grid over UDP and owns the
+    // user-facing window.  In that mode, avoid opening the legacy black SFML
+    // character-only window while preserving the exact same OSD framebuffer.
+    if (getenv("AP_OSD_UDP_ONLY") != nullptr) {
+        while (true) {
+            if (counter != last_counter) {
+                last_counter = counter;
+                uint8_t buffer2[video_lines][video_cols];
+                {
+                    WITH_SEMAPHORE(mutex);
+                    memcpy(buffer2, buffer, sizeof(buffer2));
+                }
+                send_udp_frame(&buffer2[0][0], sizeof(buffer2));
+            }
+            usleep(10000);
+        }
+    }
+
     load_font();
     {
         WITH_SEMAPHORE(AP::notify().sf_window_mutex);

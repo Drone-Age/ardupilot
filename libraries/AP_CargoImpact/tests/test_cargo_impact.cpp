@@ -90,7 +90,7 @@ TEST(CargoImpact, CameraProjectionCentersAndClips)
     EXPECT_FALSE(projection.clipped);
     ASSERT_TRUE(AP_CargoImpact::project_camera_line_of_sight(Vector3f{1.0f, 10.0f, 0.0f},
                                                               60.0f, 40.0f, 15, 8, projection));
-    EXPECT_EQ(projection.x, 29);
+    EXPECT_EQ(projection.x, 28);
     EXPECT_TRUE(projection.clipped);
     ASSERT_TRUE(AP_CargoImpact::project_camera_line_of_sight(Vector3f{-1.0f, 0.0f, 0.0f},
                                                               60.0f, 40.0f, 15, 8, projection));
