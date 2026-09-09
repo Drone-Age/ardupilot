@@ -70,6 +70,13 @@ const AP_Param::GroupInfo SlungPayloadSim::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("SYSID",   5, SlungPayloadSim,  sys_id, 2),
 
+    // @Param: RELEASE
+    // @DisplayName: Slung Payload release command
+    // @Description: Set to 1 to release the payload. Set back to 0 after landing to attach it for another test. A zero line length models a rigidly carried payload at the vehicle position.
+    // @Values: 0:Attached,1:Released
+    // @User: Advanced
+    AP_GROUPINFO("RELEASE", 6, SlungPayloadSim, release_cmd, 0),
+
     AP_GROUPEND
 };
 
@@ -99,6 +106,30 @@ void SlungPayloadSim::update(const Vector3p& veh_pos, const Vector3f& veh_vel_ef
         // more initialisation
         last_update_us = now_us;
         initialised = true;
+    }
+
+    const bool release_requested = release_cmd.get() != 0;
+    if (release_requested && !released) {
+        released = true;
+        // A release can happen while the vehicle is still climbing.  Do not
+        // retain a stale ground state from terrain data that was unavailable
+        // while the payload was attached; NED down is negative above home.
+        if (position_NED.z < -0.01) {
+            landed = false;
+        }
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "SlungPayload: released");
+#if HAL_LOGGING_ENABLED
+        AP::logger().Write("SLUR", "TimeUS,Rel", "Qb", AP_HAL::micros64(), uint8_t(1));
+#endif
+    } else if (!release_requested && released && landed) {
+        released = false;
+        position_NED = veh_pos;
+        velocity_NED = veh_vel_ef;
+        accel_NED = veh_accel_ef;
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "SlungPayload: attached");
+#if HAL_LOGGING_ENABLED
+        AP::logger().Write("SLUR", "TimeUS,Rel", "Qb", AP_HAL::micros64(), uint8_t(0));
+#endif
     }
 
     // calculate dt and update slung payload
@@ -310,6 +341,29 @@ void SlungPayloadSim::update_payload(const Vector3p& veh_pos, const Vector3f& ve
         return;
     }
 
+    // A zero line length represents cargo rigidly carried at the vehicle
+    // position. This avoids introducing pendulum motion into a stationary
+    // cargo-drop test and makes the release altitude unambiguous.
+    if (!released && line_length <= 0.001f) {
+        position_NED = veh_pos;
+        velocity_NED = veh_vel_ef;
+        accel_NED = veh_accel_ef;
+        tension_ratio = 1.0f;
+        veh_forces_ef = Vector3f{0.0f, 0.0f, GRAVITY_MSS * weight_kg};
+
+        Location payload_loc;
+        int32_t alt_terrain_cm;
+        if (get_payload_location(payload_loc) &&
+            payload_loc.get_alt_cm(Location::AltFrame::ABOVE_TERRAIN, alt_terrain_cm)) {
+            landed = alt_terrain_cm <= 1;
+        } else {
+            // Terrain may not be loaded in a lightweight SITL run.  The
+            // simulation home plane is a deterministic ground fallback.
+            landed = position_NED.z >= -0.01;
+        }
+        return;
+    }
+
     // integrate previous iterations acceleration into velocity and position
     velocity_NED += accel_NED * dt;
     position_NED += (velocity_NED * dt).todouble();
@@ -344,6 +398,21 @@ void SlungPayloadSim::update_payload(const Vector3p& veh_pos, const Vector3f& ve
 
             // not landed if above terrain
             if (landed && (alt_terrain_cm > 1)) {
+                landed = false;
+            }
+        } else {
+            // Fall back to the home plane when terrain data is unavailable.
+            // This keeps gravity active after an airborne release and still
+            // provides a deterministic collision surface for GPS-only SITL.
+            if (position_NED.z >= 0) {
+                landed = true;
+                position_NED.z = 0;
+                velocity_NED.xy().zero();
+                velocity_NED.z = MIN(velocity_NED.z, 0);
+                accel_NED.xy().zero();
+                accel_NED.z = MIN(accel_NED.z, 0);
+                veh_forces_ef.zero();
+            } else if (landed && position_NED.z < -0.01) {
                 landed = false;
             }
         }
@@ -386,7 +455,7 @@ void SlungPayloadSim::update_payload(const Vector3p& veh_pos, const Vector3f& ve
     }
 
     // sanity check payload distance from vehicle and calculate tension force
-    if (is_positive(payload_to_veh_length)) {
+    if (!released && is_positive(payload_to_veh_length)) {
 
         // calculate unit vector from payload to vehicle
         const Vector3f payload_to_veh_norm = payload_to_veh.normalized().tofloat();

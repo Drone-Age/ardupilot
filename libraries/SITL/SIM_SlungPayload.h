@@ -55,6 +55,7 @@ private:
     AP_Float line_length;   // line length in meters
     AP_Int8 sys_id;         // mavlink system id for reporting to GCS
     AP_Float drag_coef;     // drag coefficient (spheres=0.5, cubes=1.05, barrels=0.8~1.2)
+    AP_Int8 release_cmd;    // 0: attached, 1: released
 
     // send MAVLink messages to GCS
     void send_report();
@@ -90,6 +91,7 @@ private:
 
     // payload variables
     bool landed = true;     // true if the payload is on the ground
+    bool released = false;  // true after a rising edge of SLUP_RELEASE
     float tension_ratio;    // 0 if line is loose, 1 if completely taut
     Vector3p payload_to_veh;// distance vector (in meters in NED frame) from payload to vehicle (used for reporting purposes)
     Vector3p position_NED;  // payload's position (as an offset from EKF origin? offset from vehicle?) in meters
