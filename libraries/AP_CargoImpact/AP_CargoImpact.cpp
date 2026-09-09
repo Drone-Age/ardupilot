@@ -541,7 +541,7 @@ bool AP_CargoImpact::set_dynamic_camera_fov(const uint8_t camera_index,
         return false;
     }
     DynamicCameraState &state = _dynamic_camera[camera_index];
-    if (state.update_ms != 0 && sequence <= state.sequence) {
+    if (state.valid && sequence <= state.sequence) {
         return false;
     }
     state.horizontal_fov_deg = horizontal_fov_deg;
@@ -549,6 +549,7 @@ bool AP_CargoImpact::set_dynamic_camera_fov(const uint8_t camera_index,
     state.sequence = sequence;
     state.update_ms = AP_HAL::millis();
     state.valid_for_ms = valid_for_ms;
+    state.valid = true;
     return true;
 }
 
@@ -574,7 +575,7 @@ bool AP_CargoImpact::get_osd_projection(const uint8_t centre_x,
     const bool dynamic_camera = (camera2 ? _camera2_type.get() : _camera1_type.get()) == 1;
     if (dynamic_camera) {
         const DynamicCameraState &state = _dynamic_camera[camera2 ? 1 : 0];
-        if (state.update_ms == 0 || AP_HAL::millis() - state.update_ms > state.valid_for_ms) {
+        if (!state.valid || AP_HAL::millis() - state.update_ms > state.valid_for_ms) {
             return false;
         }
         hfov_deg = state.horizontal_fov_deg;

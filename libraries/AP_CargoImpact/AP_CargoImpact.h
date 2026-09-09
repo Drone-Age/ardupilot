@@ -168,6 +168,7 @@ private:
         uint32_t sequence;
         uint32_t update_ms;
         uint16_t valid_for_ms;
+        bool valid;
     } _dynamic_camera[2]{};
 
     void write_log() const;
