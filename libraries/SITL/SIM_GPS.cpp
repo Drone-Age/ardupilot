@@ -345,15 +345,20 @@ void GPS::simulate_jamming(struct GPS_Data &d)
  */
 GPS_Backend::GPS_TOW GPS_Backend::gps_time()
 {
-    GPS_TOW gps_tow;
     struct timeval tv;
     simulation_timeval(&tv);
+    return gps_time(tv);
+}
+
+GPS_Backend::GPS_TOW GPS_Backend::gps_time(const struct timeval &tv)
+{
+    GPS_TOW gps_tow;
     const uint32_t epoch = 86400*(10*365 + (1980-1969)/4 + 1 + 6 - 2) - (GPS_LEAPSECONDS_MILLIS / 1000ULL);
     uint32_t epoch_seconds = tv.tv_sec - epoch;
     gps_tow.week = epoch_seconds / AP_SEC_PER_WEEK;
     uint32_t t_ms = tv.tv_usec / 1000;
-    // round time to nearest 200ms
-    gps_tow.ms = (epoch_seconds % AP_SEC_PER_WEEK) * AP_MSEC_PER_SEC + ((t_ms/200) * 200);
+    // Preserve the sample time at rates above 5 Hz as well.
+    gps_tow.ms = (epoch_seconds % AP_SEC_PER_WEEK) * AP_MSEC_PER_SEC + t_ms;
     return gps_tow;
 }
 
@@ -483,7 +488,9 @@ void GPS::update()
     const auto &params = _sitl->gps[instance];
 
     // Only let physics run and GPS write at configured GPS rate (default 5Hz).
-    if ((now_ms - last_write_update_ms) < (uint32_t)(1000/params.hertz)) {
+    const uint32_t period_ms = MAX(1U, uint32_t(1000/params.hertz));
+    const uint32_t elapsed_ms = now_ms - last_write_update_ms;
+    if (elapsed_ms < period_ms) {
         // Reading runs every iteration.
         // Beware- physics don't update every iteration with this approach.
         // Currently, none of the drivers rely on quickly updated physics.
@@ -491,7 +498,9 @@ void GPS::update()
         return;
     }
 
-    last_write_update_ms = now_ms;
+    // Keep the configured cadence despite scheduler jitter. Skip missed
+    // periods without publishing catch-up samples or changing their times.
+    last_write_update_ms += (elapsed_ms / period_ms) * period_ms;
 
     struct GPS_Data d {};
 

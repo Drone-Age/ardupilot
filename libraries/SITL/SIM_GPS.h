@@ -86,6 +86,7 @@ public:
     };
 
     static GPS_TOW gps_time();
+    static GPS_TOW gps_time(const struct timeval &tv);
 
 protected:
 
