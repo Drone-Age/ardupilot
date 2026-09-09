@@ -415,7 +415,7 @@ void AP_CargoImpact::update()
         Vector3f wind_ned_ms;
         if (_wind_source.get() == 1) {
             wind_ned_ms = Vector3f{_wind_north_ms.get(), _wind_east_ms.get(), 0.0f};
-        } else if (!ahrs.get_wind(wind_ned_ms)) {
+        } else if (!ahrs.wind_estimate(wind_ned_ms)) {
             _result.status = Status::NO_WIND;
             write_log();
             return;
