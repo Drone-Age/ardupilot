@@ -99,6 +99,10 @@ public:
     // send camera information for a specific instance (0-based) to GCS
     void send_camera_information(uint8_t instance, mavlink_channel_t chan);
 
+    // Return the field of view configured through the standard CAM1_/CAM2_
+    // parameters. False means the instance or either field is unavailable.
+    bool get_configured_fov(uint8_t instance, float &horizontal_deg, float &vertical_deg) const;
+
     // select which instance to send on the next deferred MSG_CAMERA_INFORMATION send
     void set_camera_information_send_instance(int16_t instance) { _camera_information_send_instance = instance; }
 

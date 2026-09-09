@@ -6,6 +6,8 @@
 
 static_assert(sizeof(AP_CargoImpact::ExternalPredictionPacket) == 36, "prediction wire size changed");
 static_assert(sizeof(AP_CargoImpact::ExternalCameraPacket) == 36, "camera wire size changed");
+static_assert(AP_CargoImpact::TUNNEL_PAYLOAD_TYPE > 32767,
+              "Janus TUNNEL payload must remain in MAVLink's private experimental range");
 
 const AP_HAL::HAL &hal = AP_HAL::get_HAL();
 

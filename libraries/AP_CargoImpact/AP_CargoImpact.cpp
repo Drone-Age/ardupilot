@@ -3,6 +3,7 @@
 #if AP_CARGO_IMPACT_ENABLED
 
 #include <AP_AHRS/AP_AHRS.h>
+#include <AP_Camera/AP_Camera.h>
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Logger/AP_Logger.h>
 #include <AP_Mount/AP_Mount.h>
@@ -81,6 +82,7 @@ const AP_Param::GroupInfo AP_CargoImpact::var_info[] = {
 
     // @Param: C1_HFOV
     // @DisplayName: Camera 1 horizontal field of view
+    // @Description: Fallback field of view used only when the standard CAM1_HFOV parameter is unset
     // @Units: deg
     // @Range: 5 179
     // @User: Advanced
@@ -88,6 +90,7 @@ const AP_Param::GroupInfo AP_CargoImpact::var_info[] = {
 
     // @Param: C1_VFOV
     // @DisplayName: Camera 1 vertical field of view
+    // @Description: Fallback field of view used only when the standard CAM1_VFOV parameter is unset
     // @Units: deg
     // @Range: 5 179
     // @User: Advanced
@@ -118,6 +121,7 @@ const AP_Param::GroupInfo AP_CargoImpact::var_info[] = {
 
     // @Param: C2_HFOV
     // @DisplayName: Camera 2 horizontal field of view
+    // @Description: Fallback field of view used only when the standard CAM2_HFOV parameter is unset
     // @Units: deg
     // @Range: 5 179
     // @User: Advanced
@@ -125,6 +129,7 @@ const AP_Param::GroupInfo AP_CargoImpact::var_info[] = {
 
     // @Param: C2_VFOV
     // @DisplayName: Camera 2 vertical field of view
+    // @Description: Fallback field of view used only when the standard CAM2_VFOV parameter is unset
     // @Units: deg
     // @Range: 5 179
     // @User: Advanced
@@ -580,6 +585,19 @@ bool AP_CargoImpact::get_osd_projection(const uint8_t centre_x,
         }
         hfov_deg = state.horizontal_fov_deg;
         vfov_deg = state.vertical_fov_deg;
+    } else {
+        // Fixed cameras use ArduPilot's standard CAM1_/CAM2_ calibration.
+        // CIMP_C1_/C2_ values remain a fallback for a plain analogue camera.
+#if AP_CAMERA_ENABLED
+        AP_Camera *camera = AP::camera();
+        float standard_hfov_deg;
+        float standard_vfov_deg;
+        if (camera != nullptr &&
+            camera->get_configured_fov(camera2 ? 1 : 0, standard_hfov_deg, standard_vfov_deg)) {
+            hfov_deg = standard_hfov_deg;
+            vfov_deg = standard_vfov_deg;
+        }
+#endif
     }
     float roll_deg = camera2 ? _camera2_roll_deg.get() : _camera1_roll_deg.get();
     float pitch_deg = camera2 ? _camera2_pitch_deg.get() : _camera1_pitch_deg.get();

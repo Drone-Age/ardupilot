@@ -10,7 +10,10 @@
 
 class AP_CargoImpact {
 public:
-    static constexpr uint16_t TUNNEL_PAYLOAD_TYPE = 200;
+    // MAVLink reserves 0..32767 for registered payload types. Janus is a
+    // private firmware line, so keep its protocol in the experimental range
+    // and never collide with registered payload 200 (STorM32).
+    static constexpr uint16_t TUNNEL_PAYLOAD_TYPE = 32769;
     static constexpr uint32_t EXTERNAL_MAGIC = 0x49434144U; // "DACI" on the wire
     static constexpr uint8_t EXTERNAL_PROTOCOL_VERSION = 1;
     static constexpr uint8_t LOCAL_NED_FRAME = 1;

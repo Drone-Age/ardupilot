@@ -70,6 +70,20 @@ AP_Camera::AP_Camera(uint32_t _log_camera_bit) :
     _singleton = this;
 }
 
+bool AP_Camera::get_configured_fov(const uint8_t instance,
+                                   float &horizontal_deg,
+                                   float &vertical_deg) const
+{
+    if (instance >= AP_CAMERA_MAX_INSTANCES) {
+        return false;
+    }
+    horizontal_deg = _params[instance].hfov.get();
+    vertical_deg = _params[instance].vfov.get();
+    return isfinite(horizontal_deg) && isfinite(vertical_deg) &&
+           horizontal_deg >= 5.0f && horizontal_deg < 180.0f &&
+           vertical_deg >= 5.0f && vertical_deg < 180.0f;
+}
+
 // set camera trigger distance in a mission
 void AP_Camera::set_trigger_distance(float distance_m)
 {
