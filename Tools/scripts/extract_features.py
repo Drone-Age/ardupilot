@@ -161,6 +161,7 @@ class ExtractFeatures(BuildScriptBase):
             ('AP_GENERATOR_{type}_ENABLED', r'AP_Generator_(?P<type>.*)::init',),
 
             ('OSD_ENABLED', 'AP_OSD::update_osd',),
+            ('AP_CARGO_IMPACT_ENABLED', r'AP_CargoImpact::update\b',),
             ('HAL_PLUSCODE_ENABLE', 'AP_OSD_Screen::draw_pluscode',),
             ('OSD_PARAM_ENABLED', 'AP_OSD_ParamScreen::AP_OSD_ParamScreen',),
             ('HAL_OSD_SIDEBAR_ENABLE', 'AP_OSD_Screen::draw_sidebars',),
